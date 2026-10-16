@@ -1,0 +1,2 @@
+# Optional local geometric registration. No API or background service.
+opencv-python-headless>=4.10,<5

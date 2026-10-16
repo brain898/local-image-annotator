@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>图片批注 · 接入验证</title><link rel="stylesheet" href="probe-style.css"></head>
+<body><main>
+<p class="eyebrow">本机工作台 / 接入验证</p><h1>先打通交接，再修改图片。</h1>
+<p class="intro">网页保存批注，Codex 读取并写回。此探针仅验证交接，不生成或修改图片。</p>
+<div class="flow"><div><b>01</b><strong>保存任务</strong><span id="saved">等待创建</span></div><div><b>02</b><strong>打开与预填</strong><span id="opened">尚未请求</span></div><div><b>03</b><strong>发送与回传</strong><span id="received">等待你在 Codex 点击发送</span></div></div>
+<section class="workspace"><div class="preview"><img id="preview" alt="带编号的批注预览，原图不带红框"><p id="image-info"></p></div><div class="panel"><h2>交接任务</h2><span class="badge" id="badge">读取中</span><div id="notes"></div><p id="help">检查 Codex 输入框已预填任务路径和专用 Skill，然后点击发送。网页会自动更新，不必刷新。</p><button id="probe">创建接入测试任务并去 Codex</button><button id="cancel" class="secondary" hidden>取消探针任务</button><p id="message" role="status"></p><p class="small" id="task-id"></p><pre id="receipt" hidden></pre></div></section>
+<footer>图片与批注保存在本地项目 data 目录 · 系统打开请求不等于预填成功或已发送 · 完整图片编辑界面待接入验收后开发</footer>
+</main><script src="probe.js"></script></body></html>

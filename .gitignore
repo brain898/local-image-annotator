@@ -1,0 +1,9 @@
+data/
+__pycache__/
+*.pyc
+
+# Local development records, not part of the shared tool
+evidence/
+STATUS.md
+tests/browser_acceptance.py
+tests/verify_real_result.py

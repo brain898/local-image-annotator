@@ -1,0 +1,7 @@
+.live-status{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border:1px solid #cbd8c1;border-radius:6px;background:#edf2e5;margin:0 0 16px;font-size:12px;line-height:1.8}
+.live-status span{min-width:0;overflow-wrap:anywhere}
+.live-status button{flex-shrink:0;border-color:#a4bc95;background:#fff;font-size:11px;padding:5px 10px}
+.live-status.error{background:#fbefe6;border-color:#e2bc9e;color:#97582f}
+.live-status.error button{border-color:#d6b08d;color:#875027}
+.live-status.done{background:#e7f0df;color:#476b35}
+@media(max-width:800px){.live-status{align-items:flex-start;gap:8px;font-size:11px;padding:10px}.live-status button{font-size:10px}}
