@@ -196,15 +196,20 @@ def prepare(tid,lease):
     for r in t['regions']:
         # Context is separate and always larger than the only writable rectangle.
         margin=r.get('reference_margin',96)
-        rw=r['w']+margin*2; rh=r['h']+margin*2
-        if 'reference_margin' not in r:rw=max(1024,((rw+15)//16)*16);rh=max(1024,((rh+15)//16)*16)
+        rw=max(1024,((r['w']+margin*2+15)//16)*16)
+        rh=max(1024,((r['h']+margin*2+15)//16)*16)
         if max(rw,rh)>3840: raise ValueError('参考裁图超过 3840 像素，请拆分选区后重试；工具不会缩小原图')
-        x=max(0,min(r['x']-margin,im.width-rw)); y=max(0,min(r['y']-margin,im.height-rh))
+        x=max(0,min(r['x']-(rw-r['w'])//2,im.width-rw)); y=max(0,min(r['y']-(rh-r['h'])//2,im.height-rh))
         x2=min(im.width,x+rw); y2=min(im.height,y+rh)
         canvas=Image.new('RGBA',(rw,rh),'white'); canvas.paste(im.crop((x,y,x2,y2)),(0,0))
         p=Path(t['folder'])/f"reference-{r['number']}.png"; png(p,canvas)
         mask_path=Path(t['folder'])/f"mask-{r['number']}.png"; png(mask_path,region_mask(r))
         refs.append({'mask_path':str(mask_path),'mask_coordinates':'relative to allowed x,y; native resolution; white writable', 'number':r['number'],'path':str(p),'reference':{'x':x,'y':y,'w':rw,'h':rh},'padding':'参考图可有白色补边，未缩放原图','allowed':r})
+        try:
+            from alignment import reference_quality
+            refs[-1]['preflight']=reference_quality(canvas,dict(x=r['x']-x,y=r['y']-y,w=r['w'],h=r['h']))
+        except ImportError:
+            refs[-1]['preflight']={'sufficient_for_attempt':False,'registration_proven':False,'warning':'未安装 OpenCV，无法预检参考特征；不同尺寸输出无法自动配准。'}
     dump(Path(t['folder'])/'references.json',{'task_id':tid,'lease':lease,'references':refs}); return refs
 def compose(tid,lease,manifest):
     with tx() as c:

@@ -43,7 +43,7 @@ def run():
                 page.reload();page.wait_for_function('()=>E.regions.length===1&&E.bitmap!==null');assert page.evaluate('E.regions[0]')==r
                 report['checks']['draft_reload_mask_reference_and_text']=True
                 page.locator('#submit').click();page.wait_for_function('()=>!E.pending');t=core.state()['tasks'][0];assert t['regions'][0]==dict(r,number=1)
-                t=core.claim(t['id']);refs=core.prepare(t['id'],t['lease']);ref=refs[0];assert ref['reference']['w']==r['w']+280
+                t=core.claim(t['id']);refs=core.prepare(t['id'],t['lease']);ref=refs[0];assert ref['reference']['w']==max(1024,((r['w']+280+15)//16)*16)
                 edit=Image.open(ref['path']).convert('RGBA');rr=ref['reference'];ImageDraw.Draw(edit).rectangle((r['x']-rr['x'],r['y']-rr['y'],r['x']-rr['x']+r['w']-1,r['y']-rr['y']+r['h']-1),fill='#2222ff')
                 patch=Path(t['folder'])/'synthetic.png';core.png(patch,edit);manifest=Path(t['folder'])/'patches.json';core.dump(manifest,{'task_id':t['id'],'lease':t['lease'],'patches':[{'number':1,'path':str(patch),'reviewed':True,'review_note':'Synthetic acceptance only, no model'}]})
                 out=core.compose(t['id'],t['lease'],manifest);assert out['status']=='completed',out

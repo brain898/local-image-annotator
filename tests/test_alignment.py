@@ -5,10 +5,19 @@ from PIL import Image,ImageDraw
 import core
 try:import cv2
 except ImportError:cv2=None
-from alignment import flat_text,normalize
+from alignment import flat_text,normalize,reference_quality
 
 @unittest.skipIf(cv2 is None,'optional OpenCV not installed')
 class AlignmentTests(unittest.TestCase):
+    def test_preflight_does_not_treat_blank_or_edited_pixels_as_anchors(self):
+        im=Image.new('RGB',(300,300),'white');d=ImageDraw.Draw(im)
+        for y in range(90,200,12):
+            for x in range(90,200,12):d.rectangle((x,y,x+5,y+5),fill='black')
+        result=reference_quality(im,dict(x=80,y=80,w=140,h=140))
+        self.assertFalse(result['sufficient_for_attempt'])
+        self.assertFalse(result['registration_proven'])
+        self.assertEqual(result['candidate_count'],0)
+
     def test_flat_glyph_extraction_restores_original_background(self):
         base=np.full((100,180,3),(203,220,200),np.uint8);base[35:55,35:45]=(40,78,62);base[35:55,55:65]=(40,78,62)
         model=base.copy();gradient=np.linspace(-10,10,180)
@@ -67,4 +76,13 @@ class AlignmentTests(unittest.TestCase):
             raw=Path(t['folder'])/'raw.png';core.png(raw,Image.fromarray(cv2.warpAffine(np.array(im),M,(1254,1254),borderValue=(255,255,255))))
             result=normalize(t['id'],t['lease'],1,raw);proof=json.loads(Path(result['alignment']).read_text(encoding='utf-8'))
             self.assertGreaterEqual(proof['spatial_bins'],4);self.assertLess(proof['p95_error_original_px'],1.5);self.assertAlmostEqual(proof['matrix_reference_to_model'][0][0],1.22,places=2)
+            original_registered=Path(result['path']).read_bytes()
+            from unittest.mock import patch
+            with patch('alignment.flat_text',side_effect=ValueError('non-flat test background')):
+                fallback=normalize(t['id'],t['lease'],1,raw,flat=True)
+            self.assertEqual(Path(fallback['path']).read_bytes(),original_registered)
+            self.assertIn('non-flat test background',fallback['warning'])
+            self.assertFalse(fallback['reviewed'])
+            report=json.loads(Path(fallback['alignment']).read_text(encoding='utf-8'))
+            self.assertEqual(report['flat_text']['fallback'],'registered_model_pixels')
         core.DATA=previous

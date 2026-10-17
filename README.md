@@ -48,6 +48,8 @@ python server.py --port 47831
 
 快捷键：B 框选、M 画笔、E 擦除、H 平移，空格临时平移，滚轮缩放，Delete 删除选中的选区。
 
+如果点击「去 Codex」后没有发送、额度不足，或关机后草稿丢失，右侧底部会保留任务恢复入口。点「重新打开 Codex」可用原任务重新预填，仍需自己发送；点「取消任务，继续编辑」可解除提交限制，批注和历史记录保留。切到其他图片也能处理挡住提交的旧任务。已领取但中断的任务也可以取消，取消后旧任务不能写回结果。
+
 ## 工作原理
 
 ```text
@@ -81,7 +83,14 @@ python -m unittest discover -s tests -v
 python tests/browser_states.py
 python tests/browser_refresh.py
 python tests/browser_requests.py
+python tests/browser_recovery.py
 python tests/browser_ocr_mask.py
 ```
 
 浏览器测试需要 `pip install playwright` 和本机 Chrome，使用临时数据和 47832 端口，不调用图片模型，也不会打开 Codex。测试报告写到 `evidence/`（不纳入版本库）。
+
+### 小选区的参考图保护
+
+参考边距是最小值，参考图自动扩展到至少 1024×1024 原像素，并尽量以选区为中心保留周边内容。小原图会补白；实际可修改矩形或画笔遮罩不扩大。prepare 会报告选区外参考特征，缺少依据时先提示调整，配准成功仍须模型输出匹配验证。若只写「修复文字」，建议补充准确目标文字以减少误改。
+
+平面底色提取属于可选处理：不满足条件时保留已通过几何验证的普通配准图，并提示重新检查背景与接缝。仍须视觉审核和参考背景/选区外像素校验。此模式只保证选区外无变化，选区内可能保留模型噪点。

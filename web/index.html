@@ -30,6 +30,6 @@
 <div id="regions"></div>
 <div class="overall"><label for="overall">整图共同要求 <span>可选</span></label><textarea id="overall" rows="2" placeholder="例如：保留现有字体、配色与视觉风格。"></textarea></div>
 </div>
-<div class="submit-panel"><div id="save-state">批注随时保存到本地</div><button id="submit" class="primary" disabled>去 Codex <span>↗</span></button><p id="dispatch-help">保存任务并打开预填草稿。请在 Codex 中点击发送。</p></div>
+<div class="submit-panel"><div id="save-state">批注随时保存到本地</div><div id="active-task" hidden><p id="active-task-text"></p><div class="active-task-actions"><button id="reopen-task">重新打开 Codex</button><button id="cancel-active-task">取消任务，继续编辑</button></div></div><button id="submit" class="primary" disabled>去 Codex <span>↗</span></button><p id="dispatch-help">保存任务并打开预填草稿。请在 Codex 中点击发送。</p></div>
 </aside>
 </div><div id="toast" role="status" hidden></div><script src="app.js"></script></body></html>

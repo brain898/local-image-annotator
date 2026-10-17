@@ -7,6 +7,21 @@ import numpy as np
 from PIL import Image
 import core
 
+def reference_quality(image, allowed):
+    """Read-only preflight; feature availability is not proof of registration."""
+    import cv2
+    a=np.array(image.convert('RGB'));mask=np.full(a.shape[:2],255,np.uint8)
+    x,y,w,h=(allowed[k] for k in ('x','y','w','h'))
+    mask[y:y+h,x:x+w]=0
+    points=cv2.SIFT_create(nfeatures=5000).detect(cv2.cvtColor(a,cv2.COLOR_RGB2GRAY),mask)
+    coords=np.array([p.pt for p in points])
+    spread=np.ptp(coords,axis=0) if len(coords)>1 else np.zeros(2)
+    bins=len(set((min(3,int(px/a.shape[1]*4)),min(3,int(py/a.shape[0]*4))) for px,py in coords))
+    sufficient=len(points)>=16 and bins>=4 and spread[0]>=a.shape[1]*.5 and spread[1]>=a.shape[0]*.5
+    return {'candidate_count':len(points),'spatial_bins':bins,'spread':spread.tolist(),
+            'sufficient_for_attempt':bool(sufficient),'registration_proven':False,
+            'warning':None if sufficient else '选区外参考特征不足或集中，缩放后的模型输出可能无法可靠对齐。请扩大参考边距或使用更多完整周边内容，勿降低配准阈值。'}
+
 def flat_text(base, generated):
     import cv2
     colors,counts=np.unique(base.reshape(-1,3),axis=0,return_counts=True);order=np.argsort(counts)[::-1]
@@ -60,7 +75,7 @@ def normalize(tid,lease,number,source,flat=False):
     sift=cv2.SIFT_create(nfeatures=5000);k1,d1=sift.detectAndCompute(cv2.cvtColor(a,cv2.COLOR_RGB2GRAY),mask);k2,d2=sift.detectAndCompute(cv2.cvtColor(b,cv2.COLOR_RGB2GRAY),None)
     if d1 is None or d2 is None: raise ValueError('缺少可验证的参考锚点，不允许缩放回贴')
     matches=cv2.BFMatcher().knnMatch(d1,d2,k=2);good=[pair[0] for pair in matches if len(pair)==2 and pair[0].distance<.65*pair[1].distance]
-    if len(good)<16: raise ValueError('可靠锚点少于 16 个，不能证明对齐')
+    if len(good)<16: raise ValueError(f'仅匹配到 {len(good)} 个可靠锚点（至少需要 16 个），不能证明对齐。请扩大参考边距后新建任务，或使用新版自动扩展参考图重试；不要扩大实际修改选区。')
     src=np.float32([k1[m.queryIdx].pt for m in good]);dst=np.float32([k2[m.trainIdx].pt for m in good]);M,inliers=cv2.estimateAffinePartial2D(src,dst,method=cv2.RANSAC,ransacReprojThreshold=2,maxIters=5000,confidence=.999)
     if M is None: raise ValueError('无法求解稳定几何变换')
     ok=inliers.ravel().astype(bool);scale=math.sqrt(float(np.linalg.det(M[:,:2])));angle=math.degrees(math.atan2(M[1,0],M[0,0]));errors=np.linalg.norm(src@M[:,:2].T+M[:,2]-dst,axis=1)/scale
@@ -68,11 +83,19 @@ def normalize(tid,lease,number,source,flat=False):
     p95=float(np.quantile(errors[ok],.95));median=float(np.median(errors[ok]));expected=b.shape[1]/a.shape[1]
     if int(ok.sum())<16 or bins<4 or spread[0]<a.shape[1]*.5 or spread[1]<a.shape[0]*.5 or p95>1.5 or median>.75 or abs(angle)>.5 or abs(scale/expected-1)>.03: raise ValueError('锚点分布、残差或布局不满足对齐阈值，需要重新生成')
     warped=cv2.warpAffine(b4,cv2.invertAffineTransform(M),(a.shape[1],a.shape[0]),flags=cv2.INTER_CUBIC,borderMode=cv2.BORDER_CONSTANT,borderValue=(255,255,255,0))
-    treatment=None
+    treatment=None; warning=None
     if flat:
-        if np.any(a4[y:y+r['h'],x:x+r['w'],3]!=255) or np.any(warped[y:y+r['h'],x:x+r['w'],3]!=255):raise ValueError('透明背景不能启用平面底色文字恢复')
-        patch,treatment=flat_text(a[y:y+r['h'],x:x+r['w']],warped[y:y+r['h'],x:x+r['w'],:3]);warped=a4.copy();warped[y:y+r['h'],x:x+r['w'],:3]=patch
+        try:
+            if np.any(a4[y:y+r['h'],x:x+r['w'],3]!=255) or np.any(warped[y:y+r['h'],x:x+r['w'],3]!=255):raise ValueError('透明背景不能启用平面底色文字恢复')
+            patch,treatment=flat_text(a[y:y+r['h'],x:x+r['w']],warped[y:y+r['h'],x:x+r['w'],:3])
+        except ValueError as exc:
+            # Optional background cleanup must not invalidate proven geometry.
+            # Keep the full registered output so compose still checks its context.
+            warning='已跳过平面文字提取：'+str(exc)+'。保留普通配准结果，必须检查选区背景、字形与接缝后再合成。'
+            treatment={'method':'skipped','reason':str(exc),'fallback':'registered_model_pixels'}
+        else:
+            warped=a4.copy();warped[y:y+r['h'],x:x+r['w'],:3]=patch
     out=Path(t['folder'])/f'normalized-{number}-attempt-{t["attempt"]}.png';core.png(out,Image.fromarray(warped).convert('RGBA'))
     proof={'task_id':tid,'lease':lease,'number':number,'source_path':str(Path(source).resolve()),'source_sha256':core.sha(source),'reference_sha256':core.sha(ref['path']),'output_path':str(out),'output_sha256':core.sha(out),'matrix_reference_to_model':M.tolist(),'model_size':[b.shape[1],b.shape[0]],'reference_size':[a.shape[1],a.shape[0]],'inlier_count':int(ok.sum()),'spatial_bins':bins,'spread':spread.tolist(),'median_error_original_px':median,'p95_error_original_px':p95,'rotation_degrees':angle,'anchors':[{'reference':s.tolist(),'model':d.tolist(),'error_original_px':float(e)} for s,d,e in zip(src[ok],dst[ok],errors[ok])],'flat_text':treatment,'accepted':True,'at':core.now()}
     proof_path=out.with_suffix('.alignment.json');core.dump(proof_path,proof)
-    return {'number':number,'path':str(out),'alignment':str(proof_path),'reviewed':False,'review_note':'必须查看规范化后的模型文字及最终合成后填写审核记录','inliers':int(ok.sum()),'p95_error_original_px':p95}
+    return {'number':number,'path':str(out),'alignment':str(proof_path),'reviewed':False,'review_note':'必须查看规范化后的模型文字及最终合成后填写审核记录','warning':warning,'inliers':int(ok.sum()),'p95_error_original_px':p95}

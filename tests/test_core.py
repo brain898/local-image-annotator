@@ -25,6 +25,13 @@ class Invariants(unittest.TestCase):
         t=self.task(); md=(Path(t['folder'])/'批注.md').read_bytes()
         self.assertFalse(md.startswith(b'\xef\xbb\xbf')); self.assertIn('改数字为 2026',md.decode('utf-8')); self.assertIn('删除元素',md.decode('utf-8'))
         self.assertEqual(t['regions'][1]['x'],240)
+    def test_small_reference_margin_expands_context_not_allowed_pixels(self):
+        t=core.create_task(dict(image_id=self.image['id'],base_version_id=self.image['current_version_id'],request_key=core.ident(),regions=[dict(x=100,y=100,w=93,h=30,note='test',reference_margin=21)]))
+        t=core.claim(t['id']);ref=core.prepare(t['id'],t['lease'])[0]
+        with Image.open(ref['path']) as im:self.assertEqual(im.size,(1024,1024))
+        self.assertEqual(ref['allowed'],t['regions'][0])
+        with Image.open(ref['mask_path']) as im:self.assertEqual(im.size,(93,30))
+        self.assertFalse(ref['preflight']['registration_proven'])
     def test_bounds_and_scaled_coordinates_must_be_integer(self):
         t=self.task(); core.cancel(t['id'])
         for rect in [dict(x=-1,y=0,w=20,h=20),dict(x=10.5,y=0,w=20,h=20),dict(x=390,y=0,w=20,h=20)]:
