@@ -29,7 +29,7 @@ def run():
                 r=page.evaluate('E.regions[0]');assert r['ocr_bounds']['x']==rows[0]['x'] and r['ocr_bounds']['y']==rows[0]['y'] and r['x']<rows[0]['x'] and r['original_text']=='年度计划 2025' and r['target_text']=='年度计划 2026'
                 report['checks']['real_chinese_ocr_original_coordinates_edit_list_unchanged_excluded']=True
                 page.locator('#regions .region').first.locator('details.advanced summary').click()
-                page.locator('#regions input[aria-label="选区 1 参考边距"]').fill('140');page.locator('#regions input[aria-label="选区 1 参考边距"]').dispatch_event('change')
+                assert page.locator('#regions input[aria-label="选区 1 参考边距"]').count()==0
                 page.locator('#brush-tool').click()
                 point=page.evaluate('()=>{const r=E.regions[0],b=canvas.getBoundingClientRect();return {x:b.left+E.tx+(r.x+r.w*.3)*E.scale,y:b.top+E.ty+(r.y+r.h*.5)*E.scale,dx:r.w*.4*E.scale}}')
                 page.mouse.move(point['x'],point['y']);page.mouse.down();page.mouse.move(point['x']+point['dx'],point['y'],steps=15);page.mouse.up()
@@ -43,7 +43,7 @@ def run():
                 page.reload();page.wait_for_function('()=>E.regions.length===1&&E.bitmap!==null');assert page.evaluate('E.regions[0]')==r
                 report['checks']['draft_reload_mask_reference_and_text']=True
                 page.locator('#submit').click();page.wait_for_function('()=>!E.pending');t=core.state()['tasks'][0];assert t['regions'][0]==dict(r,number=1)
-                t=core.claim(t['id']);refs=core.prepare(t['id'],t['lease']);ref=refs[0];assert ref['reference']['w']==max(1024,((r['w']+280+15)//16)*16)
+                t=core.claim(t['id']);refs=core.prepare(t['id'],t['lease']);ref=refs[0];assert ref['reference']['w']==max(1024,((r['w']+192+15)//16)*16)
                 edit=Image.open(ref['path']).convert('RGBA');rr=ref['reference'];ImageDraw.Draw(edit).rectangle((r['x']-rr['x'],r['y']-rr['y'],r['x']-rr['x']+r['w']-1,r['y']-rr['y']+r['h']-1),fill='#2222ff')
                 patch=Path(t['folder'])/'synthetic.png';core.png(patch,edit);manifest=Path(t['folder'])/'patches.json';core.dump(manifest,{'task_id':t['id'],'lease':t['lease'],'patches':[{'number':1,'path':str(patch),'reviewed':True,'review_note':'Synthetic acceptance only, no model'}]})
                 out=core.compose(t['id'],t['lease'],manifest);assert out['status']=='completed',out

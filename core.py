@@ -19,7 +19,11 @@ def dump(p, obj):
 def png(p, im):
     p=Path(p); p.parent.mkdir(parents=True,exist_ok=True)
     q=p.with_name(p.name+'.'+ident()+'.tmp'); im.save(q,format='PNG'); os.replace(q,p)
-def sha(p): return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+def sha(p):
+    h=hashlib.sha256()
+    with Path(p).open('rb') as f:
+        for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
+    return h.hexdigest()
 def init():
     DATA.mkdir(parents=True,exist_ok=True)
     with closing(sqlite3.connect(DATA/'store.sqlite')) as c:
@@ -42,7 +46,22 @@ def allof(c,kind): return [json.loads(r[0]) for r in c.execute('SELECT body FROM
 def read(kind,id):
     with tx() as c: return get(c,kind,id)
 def state():
-    with tx() as c: return {k:allof(c,k[:-1]) for k in ('images','versions','tasks','drafts')}
+    with tx() as c:
+        hidden={i['id'] for i in allof(c,'image') if i.get('ppt_internal') or i.get('removed')}
+        return {k:[v for v in allof(c,k[:-1]) if (v['id'] if k=='images' else v.get('image_id',v['id'])) not in hidden] for k in ('images','versions','tasks','drafts')}
+def remove_from_list(kind, record_id):
+    """Only update the database visibility flag. Never touch stored files."""
+    if kind not in ('image', 'ppt_deck'): raise ValueError('不支持的列表类型')
+    with tx() as c:
+        record=get(c,kind,record_id)
+        jobs=allof(c,'ppt_job' if kind=='ppt_deck' else 'task')
+        key='deck_id' if kind=='ppt_deck' else 'image_id'
+        if any(j.get(key)==record_id and j['status'] in ('waiting','running') for j in jobs):
+            raise ValueError('有等待或运行中的任务，请先完成或取消任务')
+        if kind=='ppt_deck' and record['status']=='importing': raise ValueError('正在导入，请等待导入完成')
+        record.update(removed=True,removed_at=now()); put(c,kind,record)
+        return {'removed':True,'id':record_id}
+
 def save_draft(body):
     with tx() as c:
         image=get(c,'image',body['image_id']); base=get(c,'version',body['base_version_id'])
@@ -121,6 +140,7 @@ def create_task(body):
         for t in allof(c,'task'):
             if t['request_key']==key and t['image_id']==image['id']: return t
         if base['id']!=image['current_version_id']: raise ValueError('基准版本已变化，请重新加载')
+        if not image.get('ppt_internal') and any(j['status']=='running' for j in allof(c,'ppt_job')): raise ValueError('PPT 批量任务正在执行，请等待或取消后再改图')
         if any(t['status'] in ('waiting','running') for t in allof(c,'task')): raise ValueError('已有待发送或执行中的任务，请先完成或取消')
         regions=body.get('regions',[])
         if not 1<=len(regions)<=20: raise ValueError('请选择 1 至 20 个区域')
@@ -158,6 +178,8 @@ def claim(tid):
         t=get(c,'task',tid)
         if t['status']=='completed': return t
         if t['status']!='waiting': raise ValueError('任务不是待执行状态，不能重复领取')
+        image=get(c,'image',t['image_id'])
+        if not image.get('ppt_internal') and any(j['status']=='running' for j in allof(c,'ppt_job')): raise ValueError('PPT 队列正在执行，请稍后领取图片任务')
         t.update(status='running',attempt=t['attempt']+1,lease=ident(),started_at=now(),error=None); update(c,t); return t
 def checked(c,tid,lease):
     t=get(c,'task',tid)
@@ -171,6 +193,7 @@ def retry(tid):
         t=get(c,'task',tid)
         if t['status'] not in ('failed','needs_adjustment','cancelled'): raise ValueError('仅失败、待调整或已取消任务可重试')
         image=get(c,'image',t['image_id'])
+        if not image.get('ppt_internal') and any(j['status']=='running' for j in allof(c,'ppt_job')): raise ValueError('PPT 队列正在执行，请稍后重试图片任务')
         if image['current_version_id']!=t['base_version_id'] or image['revision']!=t['base_revision']: raise ValueError('图片版本已变化，请基于当前版本创建新任务')
         if any(a['status'] in ('waiting','running') for a in allof(c,'task')): raise ValueError('已有活动任务')
         t.update(status='waiting',error=None,lease=None); update(c,t); return t

@@ -1,9 +1,7 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>局部 · 图片批注工作台</title><link rel="stylesheet" href="editor.css"><link rel="stylesheet" href="status.css"></head>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>局部 · 图片批注工作台</title><link rel="stylesheet" href="editor.css"><link rel="stylesheet" href="status.css"><link rel="stylesheet" href="common.css"></head>
 <body>
-<header class="topbar"><div class="brand"><span class="brand-mark">局</span><div><strong>局部</strong><span>图片批注工作台</span></div></div>
-<ol id="steps" class="steps" aria-label="使用步骤"><li data-step="1"><b>1</b>导入图片</li><li data-step="2"><b>2</b>标出要改的地方并写要求</li><li data-step="3"><b>3</b>去 Codex 点发送</li><li data-step="4"><b>4</b>自动显示结果</li></ol>
-<div class="local-indicator"><i></i>本地保存 · 原图保留</div><button id="upload" class="primary">＋ 导入图片</button><input id="file" type="file" accept="image/png,image/jpeg" hidden></header>
+<header class="topbar"><a class="brand" href="/" aria-label="局部工作台"><span class="brand-mark">局</span><div><strong>局部</strong><span>图片与 PPT 修改工作台</span></div></a><nav aria-label="工作区"><a href="/" aria-current="page">图片修改</a><a href="ppt.html">PPT 专区</a></nav><span class="local-indicator">本地保存 · 原文件保留</span><button id="upload" class="primary">导入图片</button><input id="file" type="file" accept="image/png,image/jpeg" hidden></header><ol id="steps" class="steps" aria-label="使用步骤"><li data-step="1"><b>1</b>导入图片</li><li data-step="2"><b>2</b>标出要改的地方并写要求</li><li data-step="3"><b>3</b>去 Codex 点发送</li><li data-step="4"><b>4</b>自动显示结果</li></ol>
 <div class="app">
 <aside class="library"><div class="section-label">我的图片 <span id="image-count">0</span></div><div id="images"></div><div class="library-foot"><a href="probe.html">接入验证记录</a><span>PNG / JPG · 本机文件</span></div></aside>
 <main>

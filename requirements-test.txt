@@ -1,0 +1,6 @@
+-r requirements.txt
+-r requirements-alignment.txt
+python-pptx>=1,<2
+playwright>=1,<2
+rapidocr>=3,<4
+onnxruntime>=1,<2
