@@ -67,7 +67,7 @@ def run():
                 http = start()
                 context, page = new_page()
                 assert page.evaluate('E.image.name') == 'B.png'
-                assert '另一张图片「A.png」' in page.locator('#active-task-text').inner_text()
+                assert '其他图片' in page.locator('#active-task-text').inner_text();assert page.locator('#active-task-text').get_attribute('title')=='A.png'
                 assert page.locator('#submit').is_hidden()
                 for selector in ('#reopen-task', '#cancel-active-task'):
                     bounds = page.locator(selector).bounding_box()

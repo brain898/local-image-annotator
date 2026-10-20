@@ -14,7 +14,7 @@ from test_list_remove import payload_hashes
 def run():
     old=core.DATA
     report={'isolated':True,'model_called':False,'handoff_stubbed':True,'checks':{},'screenshots':[]}
-    evidence=core.ROOT/'evidence/ppt-ux';evidence.mkdir(parents=True,exist_ok=True)
+    evidence=core.ROOT/'evidence/ui-slim';evidence.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='ppt-ux-browser-') as tmp:
         core.DATA=Path(tmp)/'data';core.init();sample=make_deck(Path(tmp)/'fixture.pptx')
         http=server.LocalServer(('127.0.0.1',0),server.Handler)
@@ -30,17 +30,25 @@ def run():
                 def capture(state,title,button):
                     page.wait_for_function('(state)=>document.querySelector("#next-step").dataset.stage===state',arg=state)
                     assert title in page.locator('#next-step h2').inner_text()
-                    assert page.locator('#next-step .primary').inner_text()==button
+                    if state=='draft':
+                        b=page.locator('#analyze').bounding_box();assert b and b['y']+b['height']<=1000
+                        assert page.locator('#page-image').bounding_box()['y']<page.locator('#proposal').bounding_box()['y']
+                    if state!='empty':assert page.locator('#page-image').is_visible()
+                    assert page.locator({'empty':'#next-step .primary','draft':'#analyze','waiting':'#next-step .primary','plan':'#execute','complete':'#next-step .primary'}[state]).inner_text()==button
                     for width in (1480,1000,760):
                         page.set_viewport_size({'width':width,'height':1000});page.evaluate('scrollTo(0,0)')
                         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),(state,width)
+                        if state=='plan' and width==760:
+                            bounds=page.locator('#confirm-all').bounding_box()
+                            assert bounds and bounds['y']+bounds['height']<=1000
+                            page.screenshot(path=str(evidence/'after-ppt-plan-760.png'))
                         if width!=760:
-                            target=evidence/f'{state}-{width}.png';page.screenshot(path=str(target))
+                            target=evidence/f'after-ppt-{state}-{width}.png';page.screenshot(path=str(target))
                             report['screenshots'].append({'path':str(target),'state':state,'width':width,'next_button':button})
                     page.set_viewport_size({'width':1480,'height':1000})
                 page.goto(base+'/ppt.html');page.wait_for_function('()=>!P.polling')
                 capture('empty','从一份 PPT 开始','导入 PPTX')
-                page.locator('#dismiss-guide').click();page.reload();assert page.locator('#onboarding').is_hidden()
+                assert page.locator('#onboarding,#dismiss-guide').count()==0
                 # Failed upload must release same-file input.
                 page.route('**/api/ppt/upload-file',lambda r:r.fulfill(status=400,content_type='application/json',body='{"error":"隔离上传失败"}'))
                 page.locator('#file').set_input_files(str(sample));page.wait_for_function('()=>!P.busy&&document.querySelector("#file").value===""')
@@ -49,13 +57,13 @@ def run():
                 page.locator('#file').set_input_files(str(sample))
                 page.wait_for_function('()=>deck()?.status==="ready"',timeout=120000)
                 capture('draft','写下要改什么','让 Codex 分析要求')
-                report['checks']['same_file_retry_and_onboarding_persistence']=True
+                report['checks']['same_file_retry_and_removed_onboarding']=True
                 assert page.locator('#pages').input_value()=='全部 7 页'
                 page.locator('.selection').evaluate('(e)=>e.open=true')
                 page.locator('#select-all').click();page.wait_for_function('()=>selected().length===0&&!P.busy')
                 assert page.locator('.thumb input:checked').count()==0
-                assert page.locator('#next-analyze').is_disabled()
-                assert '至少选择 1 页' in page.locator('#next-step').inner_text()
+                assert page.locator('#analyze').is_disabled()
+                assert page.locator('#analyze').get_attribute('title')=='至少选择 1 页';assert page.locator('.action-reason').count()==0
                 page.locator('#select-all').click();page.wait_for_function('()=>selected().length===7&&!P.busy')
                 assert page.locator('#select-all').inner_text()=='取消全选'
                 page.locator('#pages').fill('1,3-4');page.locator('#pages').press('Enter')
@@ -86,9 +94,9 @@ def run():
                 report['checks']['page_box_draw_move_resize_pager_keyboard']=True
                 page.evaluate('window.thumbNode=document.querySelector(".thumb")')
                 page.wait_for_timeout(3500);assert page.evaluate('thumbNode===document.querySelector(".thumb")')
-                page.locator('#next-analyze').click();page.wait_for_function('()=>activeJobs().length===1&&!P.busy')
-                capture('waiting','已在 Codex 打开草稿','重新打开 Codex')
-                assert page.locator('#editing-area').is_hidden()
+                page.locator('#analyze').click();page.wait_for_function('()=>activeJobs().length===1&&!P.busy')
+                capture('waiting','去 Codex 点发送','重新打开 Codex')
+                assert page.locator('#editing-area').is_visible();assert page.locator('#page-image').is_visible();assert page.locator('#jobs button').count()==0;assert page.locator('#notice').is_hidden()
                 j=ppt.state()['jobs'][0]
                 before=payload_hashes()
                 try:core.remove_from_list('ppt_deck',j['deck_id']);raise AssertionError('active deck removed')
@@ -97,7 +105,7 @@ def run():
                 page.evaluate('window.jobNode=document.querySelector(".job");window.thumbNode=document.querySelector(".thumb")')
                 page.wait_for_timeout(3500)
                 assert page.evaluate('jobNode===document.querySelector(".job")&&thumbNode===document.querySelector(".thumb")')
-                report['checks']['waiting_hides_editor_and_polling_preserves_nodes']=True
+                report['checks']['waiting_keeps_preview_unique_controls_and_polling_preserves_nodes']=True
                 poll_requests=[];watch=lambda request:poll_requests.append(request.url) if request.url.endswith('/api/ppt/state') else None
                 page.on('request',watch);page.wait_for_function('()=>!P.polling')
                 page.evaluate('Object.defineProperty(document,"hidden",{configurable:true,value:true})')
@@ -110,10 +118,13 @@ def run():
                 core.dump(manifest,dict(job_id=j['id'],lease=claim['lease'],base_sha256=j['base_sha256'],request_hash=j['request_hash'],items=[dict(page=1,object_id='2',method='native',old='2025',new='2026',note='更新年份',evidence='模拟分析。preview_path / source_path / 1e-6 仅用于技术依据')],unchanged_pages=[dict(page=n,reason='本次不涉及') for n in range(2,8)]))
                 plan=submit_mock_plan(j['id'],claim['lease'],manifest)
                 page.wait_for_function('()=>P.plan?.items.length===1')
-                capture('plan','核对右侧 1 项','核对并确认清单')
-                assert page.get_by_text('技术依据',exact=True).is_visible()
-                page.locator('#confirm-all').click();page.wait_for_function('()=>P.plan.items[0].confirmed&&!P.busy')
-                assert page.locator('.plan-card.confirmed .confirmed-badge').inner_text()=='已确认'
+                capture('plan','核对右侧清单','执行已确认的 0 项')
+                assert page.locator('.card-editor').is_hidden();page.locator('.edit-card').click();assert page.get_by_text('技术依据',exact=True).is_visible();page.locator('.edit-card').click()
+                page.route('**/api/ppt/confirm',lambda r:r.fulfill(status=400,content_type='application/json',body=json.dumps({'error':'隔离确认失败'})))
+                page.locator('.item-confirm').click();page.wait_for_function('()=>!P.busy');assert not page.locator('.item-confirm').is_checked();assert not page.evaluate('!!P.plan.items[0].confirmed')
+                page.unroute('**/api/ppt/confirm');page.locator('.item-confirm').click();page.wait_for_function('()=>P.plan.items[0].confirmed&&!P.busy');assert page.locator('#confirm-all').is_disabled()
+                report['checks']['compact_checkbox_failure_and_single_confirmation']=True
+                assert page.locator('.plan-card.confirmed .item-confirm').is_checked()
                 # Scope cancellation preserves confirmations, accepted change invalidates them.
                 def dismiss(dialog):dialog.dismiss()
                 page.remove_listener('dialog',accept_dialog);page.on('dialog',dismiss)
@@ -122,14 +133,14 @@ def run():
                 assert page.evaluate('!!P.plan.items[0].confirmed')
                 page.remove_listener('dialog',dismiss);page.on('dialog',accept_dialog)
                 report['checks']['confirmed_scope_change_has_cancelable_guard']=True
-                page.locator('#next-step .primary').click();page.wait_for_function('()=>activeJobs()[0]?.kind==="execution"&&!P.busy')
+                page.locator('#execute').click();page.wait_for_function('()=>activeJobs()[0]?.kind==="execution"&&!P.busy')
                 execution=next(j for j in ppt.state()['jobs'] if j['kind']=='execution');job=ppt.claim(execution['id'])
                 ppt.next_item(job['id'],job['lease']);out=ppt.publish(job['id'],job['lease'])
                 page.wait_for_function('()=>stage()==="complete"',timeout=120000)
-                capture('complete','成功 1 项，未完成 0 项','导出 PPTX')
-                assert '这份清单基于旧版本，已失效' in page.locator('#plan-status').inner_text()
+                capture('complete','成功 1 · 未完成 0','导出 PPTX')
+                assert '清单已失效' in page.locator('#plan-status').inner_text()
                 assert page.locator('#execute').is_disabled()
-                assert '上一轮要求已归档' in page.locator('#notice').inner_text()
+                assert page.locator('#result-summary').is_hidden();assert page.locator('#export').is_hidden();assert page.locator('#task-section').get_attribute('open') is None
                 assert page.get_by_role('button',name='带回上一轮要求',exact=True).is_visible()
                 page.get_by_role('button',name='查看对比',exact=True).click()
                 assert page.locator('#comparisons>.compare-page').count()==1

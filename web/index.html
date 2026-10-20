@@ -1,17 +1,17 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>局部 · 图片批注工作台</title><link rel="stylesheet" href="editor.css"><link rel="stylesheet" href="status.css"><link rel="stylesheet" href="common.css"></head>
 <body>
-<header class="topbar"><a class="brand" href="/" aria-label="局部工作台"><span class="brand-mark">局</span><div><strong>局部</strong><span>图片与 PPT 修改工作台</span></div></a><nav aria-label="工作区"><a href="/" aria-current="page">图片修改</a><a href="ppt.html">PPT 专区</a></nav><span class="local-indicator">本地保存 · 原文件保留</span><button id="upload" class="primary">导入图片</button><input id="file" type="file" accept="image/png,image/jpeg" hidden></header><ol id="steps" class="steps" aria-label="使用步骤"><li data-step="1"><b>1</b>导入图片</li><li data-step="2"><b>2</b>标出要改的地方并写要求</li><li data-step="3"><b>3</b>去 Codex 点发送</li><li data-step="4"><b>4</b>自动显示结果</li></ol>
+<header class="topbar"><a class="brand" href="/" aria-label="局部工作台"><span class="brand-mark">局</span><strong>局部</strong></a><nav aria-label="工作区"><a href="/" aria-current="page">图片修改</a><a href="ppt.html">PPT 专区</a></nav><button id="upload" class="primary">导入图片</button><input id="file" type="file" accept="image/png,image/jpeg" hidden></header><ol id="steps" class="steps" aria-label="使用步骤"><li data-step="1"><b>1</b>导入图片</li><li data-step="2"><b>2</b>写批注</li><li data-step="3"><b>3</b>去 Codex 发送</li><li data-step="4"><b>4</b>看结果</li></ol>
 <div class="app">
-<aside class="library"><div class="section-label">我的图片 <span id="image-count">0</span></div><div id="images"></div><div class="library-foot"><a href="probe.html">接入验证记录</a><span>PNG / JPG · 本机文件</span></div></aside>
+<aside class="library"><div class="section-label">我的图片 <span id="image-count">0</span></div><div id="images"></div></aside>
 <main>
-<div class="document-head"><div><p class="eyebrow">保留整体，只改局部</p><h1 id="document-name">选择一张图片，开始批注</h1></div><span id="dimensions" class="muted"></span></div>
+<div class="document-head"><div><h1 id="document-name">图片修改</h1></div><span id="dimensions" class="muted"></span></div>
 <div id="live-status" class="live-status" role="status" hidden><span id="live-status-text"></span><button id="live-status-action" hidden></button></div>
 <div class="canvas-tools">
-<div class="segmented" role="toolbar" aria-label="画布工具"><button id="draw-tool" class="active" title="拖动创建选区，快捷键 B">框选 <kbd>B</kbd></button><button id="brush-tool" title="在选区内涂出允许修改的部分，快捷键 M">画笔 <kbd>M</kbd></button><button id="erase-tool" title="擦掉画笔涂过的部分，快捷键 E">擦除 <kbd>E</kbd></button><button id="pan-tool" title="拖动平移，快捷键 H；空格临时平移">平移 <kbd>H</kbd></button></div>
+<div class="segmented" role="toolbar" aria-label="画布工具"><button id="draw-tool" class="active" title="拖动创建选区，快捷键 B">框选</button><button id="brush-tool" title="在选区内涂出允许修改的部分，快捷键 M">画笔</button><button id="erase-tool" title="擦掉画笔涂过的部分，快捷键 E">擦除</button><button id="pan-tool" title="拖动平移，快捷键 H；空格临时平移">平移</button></div>
 <div id="brush-options" class="brush-options" hidden><label>笔宽 <input id="brush-size" type="number" min="1" max="1000" value="24"> px</label><button id="rect-mask" title="删除当前选区的画笔遮罩，恢复为整个矩形都可修改">清除遮罩</button></div>
-<span class="divider"></span><button id="zoom-out" aria-label="缩小">−</button><output id="zoom">100%</output><button id="zoom-in" aria-label="放大">＋</button><button id="fit">适应画布</button><label class="toggle"><input id="show-boxes" type="checkbox" checked>显示批注</label><label class="toggle compare-toggle"><input id="compare" type="checkbox">前后对比</label></div>
-<div id="stage" tabindex="0" aria-label="图片画布，框选模式下拖动创建矩形，平移模式下拖动移动图片"><canvas id="canvas"></canvas><div id="empty"><div class="empty-symbol">＋</div><h2>把修改留在选区里</h2><p>导入一张 PPT 或海报，框出一句话、一个数字或局部元素。<br>只有选区会被修改，其余像素由程序严格保留。</p><button id="empty-upload" class="outline">导入 PNG / JPG</button></div><div id="canvas-hint">拖动框选 · 点击选区调整 · 滚轮缩放 · 空格平移</div></div>
+<span class="divider"></span><button id="zoom-out" aria-label="缩小">−</button><output id="zoom">100%</output><button id="zoom-in" aria-label="放大">＋</button><button id="fit">适应画布</button><button id="ocr">识别文字</button><details class="view-menu"><summary>视图</summary><div><label class="toggle"><input id="show-boxes" type="checkbox" checked>显示批注</label><label class="toggle compare-toggle"><input id="compare" type="checkbox">前后对比</label></div></details></div>
+<div id="stage" tabindex="0" aria-label="图片画布，框选模式下拖动创建矩形，平移模式下拖动移动图片"><canvas id="canvas"></canvas><div id="empty"><div class="empty-symbol">＋</div><h2>暂无图片</h2><button id="empty-upload" class="outline" hidden>导入 PNG / JPG</button></div></div>
 <div id="compare-controls" hidden><span>修改前</span><select id="compare-base" aria-label="对比基准版本"></select><input id="slider" type="range" min="0" max="100" value="50" aria-label="前后滑动对比"><span>当前查看版本</span></div>
 <div class="version-head"><span class="section-label">版本历史</span><div><button id="restore" class="text-button" disabled>恢复此版本</button><a id="export" class="export" download="图片.png">导出原尺寸 PNG ↗</a></div></div><div id="versions" class="versions"></div>
 <section class="task-section"><div class="section-label">执行任务 <span id="task-count">0</span></div><div id="tasks"></div></section>
@@ -20,14 +20,12 @@
 <div class="inspector-head"><h2>修改批注</h2><span id="region-count">0 处</span></div>
 <div class="inspector-body">
 <section class="add-panel" aria-label="添加批注">
-<div class="add-way"><span class="way-icon">⬚</span><div><b>框选</b><span>在左侧图片上拖出矩形，再写要改什么</span></div></div>
-<div class="add-way"><span class="way-icon">文</span><div><b>改图中文字</b><span>识别出文字后，直接填写新内容</span></div><button id="ocr">识别文字</button></div>
 <p id="ocr-status" role="status"></p><div id="ocr-rows" class="ocr-rows"></div>
 </section>
-<div id="regions-empty" class="regions-empty">还没有批注。用上面任意一种方式添加，每处单独写修改要求。</div>
+<div id="regions-empty" class="regions-empty">暂无批注</div>
 <div id="regions"></div>
 <div class="overall"><label for="overall">整图共同要求 <span>可选</span></label><textarea id="overall" rows="2" placeholder="例如：保留现有字体、配色与视觉风格。"></textarea></div>
 </div>
-<div class="submit-panel"><div id="save-state">批注随时保存到本地</div><div id="active-task" hidden><p id="active-task-text"></p><div class="active-task-actions"><button id="reopen-task">重新打开 Codex</button><button id="cancel-active-task">取消任务，继续编辑</button></div></div><button id="submit" class="primary" disabled>去 Codex <span>↗</span></button><p id="dispatch-help">保存任务并打开预填草稿。请在 Codex 中点击发送。</p></div>
+<div class="submit-panel"><div id="save-state" hidden></div><div id="active-task" hidden><p id="active-task-text"></p><div class="active-task-actions"><button id="reopen-task">重新打开 Codex</button><button id="cancel-active-task">取消任务，继续编辑</button></div></div><button id="submit" class="primary" disabled>去 Codex <span>↗</span></button></div>
 </aside>
 </div><div id="toast" role="status" hidden></div><script src="app.js"></script></body></html>

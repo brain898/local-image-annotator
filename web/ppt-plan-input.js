@@ -28,10 +28,9 @@ function renderInputs(){
   const d=deck(),allowed=canFrame();
   $('#boxes').querySelectorAll('.draft-box,.draft-label,.draft-handle').forEach(e=>e.remove());
   $('#draw-box').disabled=!allowed;
-  $('#draw-box').textContent=P.frameMode?'框选中，再点退出':'框选修改';
-  $('#draw-box').setAttribute('aria-pressed',String(P.frameMode));
+  $('#draw-box').textContent=P.frameMode&&allowed?'框选中，再点退出':'框选修改';
+  $('#draw-box').setAttribute('aria-pressed',String(P.frameMode&&allowed));
   $('#preview').classList.toggle('framing',P.frameMode&&allowed);
-  $('#draw-help').textContent=!allowed&&d?.status==='ready'?'查看当前版本且无活动任务时可以框选。':'点击「框选修改」，在页面上拖出范围；框选是定位提示，整理后统一确认实际修改范围。';
   for(const [index,h] of (P.hints||[]).entries())if(h.page===P.page)drawHint(P.pageDrag?.id===h.id&&P.pageDrag.box?P.pageDrag.box:h.box,index+1);
   if(P.pageDrag?.page===P.page&&P.pageDrag.box&&!P.pageDrag.id)drawHint(P.pageDrag.box,0,true);
   const hints=P.hints||[];
@@ -42,10 +41,10 @@ function renderInputs(){
     P.hintsKey=key;const host=$('#box-notes');host.replaceChildren();
     hints.forEach((h,index)=>{
       const card=el('article',{className:'hint-card',id:'hint-'+h.id});
-      card.append(el('strong',{},`第 ${h.page} 页 · 框 ${index+1}${scope.includes(h.page)?'':'（本次不处理，未勾选此页）'}`));
+      card.append(el('strong',{},`第 ${h.page} 页 · 框 ${index+1}${scope.includes(h.page)?'':'（未选）'}`));
       const label=el('label',{},'这处怎么改'),input=el('textarea',{value:h.note||'',rows:2,maxLength:6000});
       input.setAttribute('aria-label',`第 ${h.page} 页框 ${index+1} 修改要求`);
-      input.placeholder='例如：把这里的日期改为 10 月 20 日；或在上方我的修改要求中统一说明';
+      input.placeholder='例如：日期改为 10 月 20 日';
       input.disabled=!!activeJobs().length;
       input.oninput=()=>{h.note=input.value;P.dirty=true;saveDraft();P.hintsKey=JSON.stringify([P.hints,scope,activeJobs().map(j=>j.id)]);buttons();};
       input.onchange=()=>{P.invalidating=edited().catch(e=>notice(e.message,true));};
@@ -99,10 +98,12 @@ $('#preview').onpointerup=e=>{
     if(!scope.includes(P.page)){P.selectedPages.add(P.page);scopeDisplay();}
     await edited();renderPreview();
     $('#hint-'+hint.id)?.querySelector('textarea')?.focus({preventScroll:true});
-    notice('框选已加入。填写这处要求，或在上方我的修改要求中统一说明。');
+
   });
 };
 $('#preview').onpointercancel=()=>{P.pageDrag=null;renderPreview();};
+$('#page-req').oninput=e=>setPageRequirement(P.page,e.target.value);
+$('#page-req').onpaste=e=>{const text=e.clipboardData?.getData('text');if(!text||!/\r|\n/.test(text))return;e.preventDefault();const input=e.currentTarget;input.setRangeText(text.replace(/\r\n|[\r\n]/g,'；'),input.selectionStart,input.selectionEnd,'end');input.dispatchEvent(new Event('input',{bubbles:true}));};
 $('#proposal').oninput=()=>{P.dirty=true;buttons();saveDraft();};
 $('#proposal').onchange=()=>{P.invalidating=edited().catch(e=>notice(e.message,true));};
 function dragBox(drag,q){const a=drag.start,r=drag.old,s=deck().structure;if(drag.id&&!drag.corner)return {x:Math.max(0,Math.min(s.width-r.w,r.x+q.x-a.x)),y:Math.max(0,Math.min(s.height-r.h,r.y+q.y-a.y)),w:r.w,h:r.h};const anchor=drag.corner?{x:drag.corner.includes('w')?r.x+r.w:r.x,y:drag.corner.includes('n')?r.y+r.h:r.y}:a;return {x:Math.min(anchor.x,q.x),y:Math.min(anchor.y,q.y),w:Math.abs(anchor.x-q.x),h:Math.abs(anchor.y-q.y)};}

@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='local-image-refresh-') as folder:
         with sync_playwright() as p:
             browser=p.chromium.launch(channel='chrome',headless=True);page=browser.new_page(viewport={'width':1450,'height':1050});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
             page.goto('http://127.0.0.1:47833');page.wait_for_function('() => E.bitmap !== null')
-            page.locator('#compare').check();page.locator('#slider').fill('100');page.locator('#slider').dispatch_event('input')
+            page.locator('.view-menu summary').click();page.locator('#compare').check();page.locator('#slider').fill('100');page.locator('#slider').dispatch_event('input')
             second=finish(new_task(),'#2255aa');page.wait_for_function(f"() => E.view === '{second['id']}'")
             report['observations']['comparison_hidden_after_new_result']=not page.locator('#compare').is_checked()
             page.locator('#compare').uncheck()

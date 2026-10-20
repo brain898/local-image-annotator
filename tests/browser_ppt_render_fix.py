@@ -25,14 +25,14 @@ def run():
             with sync_playwright() as pw:
                 browser=pw.chromium.launch(channel='chrome',headless=True);page=browser.new_page(viewport={'width':1480,'height':1000});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
                 page.goto(f'http://127.0.0.1:{http.server_port}/ppt.html');page.wait_for_function('() => P.data?.versions.some(v=>v.report)')
-                assert '没有修改项通过验收' in page.locator('#result-summary').inner_text()
+                assert '成功 0 · 未完成 1' in page.locator('#next-step').inner_text();assert page.locator('#result-summary').is_hidden()
                 assert page.locator('#versions option:checked').inner_text()=='未完成（0 项成功）'
                 assert '批量执行 · 未完成' in page.locator('#jobs').inner_text();report['checks']['zero_success_is_failed_not_partial']=True
                 assert page.get_by_role('button',name='继续未完成项').first.is_visible();report['checks']['explicit_recovery_remains_available']=True
                 response=page.request.get(f'http://127.0.0.1:{http.server_port}'+version['report_url'])
                 assert response.status==200 and response.json()['successful']==[]
                 assert response.body()==Path(version['path']).with_name('changes.json').read_bytes();report['checks']['json_report_download_exact_bytes']=True
-                with page.expect_download() as result:page.locator('#export').click()
+                with page.expect_download() as result:page.locator('#next-step .primary').click()
                 assert '-未完成.pptx' in result.value.suggested_filename
                 target=Path(tmp)/'download.pptx';result.value.save_as(str(target));assert core.sha(target)==version['sha256'];report['checks']['unchanged_download_label_and_hash']=True
                 for width in (1180,760):

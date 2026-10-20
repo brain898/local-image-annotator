@@ -30,7 +30,7 @@ def run():
                 assert len(requests)==1 and requests[0]['url'].endswith('/api/ppt/upload-file');assert requests[0]['content_type']=='application/octet-stream'
                 original=Path(d['original_path']);assert core.sha(original)==core.sha(sample)
                 page.locator('#result').evaluate('(e)=>e.open=true')
-                with page.expect_download() as download:page.locator('#export').click()
+                with page.expect_download() as download:page.get_by_role('button',name='下载原文件',exact=True).click()
                 target=tmp/'download.pptx';download.value.save_as(str(target));assert core.sha(target)==core.sha(sample)
                 pack=Package(target);assert pack.object(1,'3')['text']=='Large upload 2025';assert not pack.parts.edits
                 report.update(binary_request=True,original_hash_preserved=True,powerpoint_real_render=True,download_hash_preserved=True,lazy_parts=True,page_errors=errors);assert not errors;browser.close()

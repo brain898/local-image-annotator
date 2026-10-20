@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix='local-image-state-test-') as folder:
             out=core.compose(t['id'],t['lease'],manifest);assert out['status']=='completed'
             page.wait_for_function('() => E.view === E.image.current_version_id && E.data.versions.length === 2 && E.regions.length === 0')
             page.locator('.status.completed').wait_for();assert page.locator('.status.completed').count()==1;result['checks']['new_version_auto_update_without_reload']=True
-            page.locator('#compare').check();page.locator('#slider').fill('0');page.locator('#slider').dispatch_event('input');after=page.evaluate('canvas.toDataURL()')
+            page.locator('.view-menu summary').click();page.locator('#compare').check();page.locator('#slider').fill('0');page.locator('#slider').dispatch_event('input');after=page.evaluate('canvas.toDataURL()')
             page.locator('#slider').fill('100');page.locator('#slider').dispatch_event('input');before=page.evaluate('canvas.toDataURL()');assert after!=before;result['checks']['comparison_slider_changes_render']=True
             with page.expect_download() as got: page.locator('#export').click()
             download=Path(folder)/'export.png';got.value.save_as(str(download))
